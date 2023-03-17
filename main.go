@@ -59,7 +59,7 @@ func main() {
 	router := gin.Default()
 
 	// Serve frontend static files
-	router.StaticFile("/settings.svg", "./resources/settings.svg")
+	router.StaticFile("/favicon.ico", "./resources/favicon.ico")
 	router.Use(static.Serve("/", static.LocalFile("./views", true)))
 
 	// Setup route group for the API
