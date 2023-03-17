@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	syslog "github.com/RackSec/srslog"
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/vault/api"
@@ -40,12 +41,18 @@ type VaultAppRole struct {
 
 var vaultAppRole VaultAppRole
 var vaultAddr string
+var w *syslog.Writer
 
 func main() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
+	w, err = syslog.Dial("tcp", "irc-docker.brnv.rw:1523", syslog.LOG_INFO, "otl")
+	if err != nil {
+		log.Fatal("failed to dial syslog")
+	}
+	w.Info("Starting service OTL")
 	rand.Seed(time.Now().Unix())
 	gin.SetMode(gin.ReleaseMode)
 	vaultAddr = os.Getenv("VAULT_ADDR")
@@ -128,14 +135,18 @@ func GetLink(c *gin.Context) {
 		return
 
 	}
+	ip := ReadUserIP(c.Request)
 	client.SetWrappingLookupFunc(nil)
 	unwrappedResponse, err := client.Logical().Write("/sys/wrapping/unwrap", map[string]interface{}{
 		"token": token,
 	})
 	if err != nil {
+		w.Err(fmt.Sprintf("ERROR unwrapping token %s from ip %s, MSG: %s", secureToken(token), ip, err.Error()))
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Сообщение не найдено или истёк срок его жизни"})
 		return
 	}
+	w.Info(fmt.Sprintf("Unwrapped token %s from ip %s ", secureToken(token), ip))
+
 	c.Header("Content-Type", "application/json")
 	c.JSON(http.StatusOK, unwrappedResponse.Data)
 }
@@ -184,6 +195,8 @@ func AddLink(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Ошибка создания секрета", "error": err.Error()})
 		return
 	}
+	ip := ReadUserIP(c.Request)
+	w.Info(fmt.Sprintf("Wrapped info to token %s from ip %s ", secureToken(wrappedResponse.WrapInfo.Token), ip))
 
 	c.JSON(http.StatusOK, wrappedResponse.WrapInfo.Token)
 }
@@ -219,4 +232,28 @@ func generatePassword(passwordLength, minSpecialChar, minNum, minUpperCase int) 
 		inRune[i], inRune[j] = inRune[j], inRune[i]
 	})
 	return string(inRune)
+}
+
+func ReadUserIP(r *http.Request) string {
+	IPAddress := r.Header.Get("X-Real-Ip")
+	if IPAddress == "" {
+		IPAddress = r.Header.Get("X-Forwarded-For")
+	}
+	if IPAddress == "" {
+		IPAddress = r.RemoteAddr
+	}
+	if strings.Index(IPAddress, "::1") > -1 {
+		return "127.0.0.1"
+	}
+	i := strings.Index(IPAddress, ":")
+	if i > -1 {
+		return IPAddress[:i]
+	} else {
+		return IPAddress
+	}
+
+}
+
+func secureToken(token string) string {
+	return token[:8] + "*-*" + token[28:]
 }
