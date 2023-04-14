@@ -48,7 +48,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-	w, err = syslog.Dial("tcp", "irc-docker.brnv.rw:1523", syslog.LOG_INFO, "otl")
+	w, err = syslog.Dial("tcp", os.Getenv("LOG_SERVER"), syslog.LOG_INFO, "otl")
 	if err != nil {
 		log.Fatal("failed to dial syslog")
 	}
