@@ -9,13 +9,13 @@ const validPeriods = {
     "480m": "8 часов",
 }
 const App = () => {
-    const [validFor, setValidFor] = useState("10m")
+    const [validFor, setValidFor] = useState("60m")
     const [text, setText] = useState('');
     const [errMsg, setErrMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [token, setToken] = useState('');
     const [isCoped, setIsCoped] = useState(false);
-    const [passwordLen, setPasswordLen] = useState(6);
+    const [passwordLen, setPasswordLen] = useState(8);
     const [settings, setSettings] = useState(false);
     
 
